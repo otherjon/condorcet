@@ -1,0 +1,90 @@
+#!/usr/bin/perl
+use strict;
+
+# Condorcet election method
+# Voters rank candidates in order of preference
+# A vote (A, B, C) is interpreted as saying that the voter prefers A over
+#   B and over C (and any other candidates), B over C (and any others),
+#   and C over any others.  ("Pairwise")
+# A matrix is generated to reflect these pairwise choices.
+# The total vote is the sum of all vote matrices.
+#
+my (@totals, @thismatrix, @vote, $favored_ind, $favored_cand, $lower_ind,
+    $lower_cand, $vote_ind, %cnum, $max_n_cands, $next_cand_index);
+
+sub add_matrix_to_totals (\@\@) {
+  my ($thisvoteptr, $totalsptr) = @_;
+  my ($i, $j);
+  foreach $i (1..$max_n_cands) {
+    foreach $j (1..$max_n_cands) {
+      $totalsptr->[$i][$j] += $thisvoteptr->[$i][$j];
+    }
+  }
+}
+
+sub showmatrix (@) {
+  my (@m) = @_;
+  my ($i, $j, $max);
+  $max = $next_cand_index - 1;
+  printf "   |   " . ("%2d  " x $max) . "\n", 1 .. $max;
+  print "-----", "----" x $max, "\n";
+
+  foreach $i (1..$max) {
+    printf "%2d |  ", $i;
+    foreach $j (1..$max) {
+      if ($i == $j) { print "  * "; }
+      elsif (not defined $m[$i][$j]) { print "  . "; }
+      else { printf "%3d ", $m[$i][$j]; };
+    }
+    print "\n";
+  }
+  print "\n";
+}
+
+my $filename = defined $ARGV[0] ? $ARGV[0] : "./data";
+open DATA, $filename or die "Can't open vote file '$filename'\n";
+$max_n_cands = 6; $next_cand_index = 1;
+
+while (<DATA>) {
+  s/#.*//; next if /^\s*$/;
+  @vote = split;
+  @thismatrix = ();
+  foreach $vote_ind (0..$#vote) {
+    $favored_cand = $vote[$vote_ind];
+    if (not defined $cnum{$favored_cand}) {
+       $cnum{$favored_cand} = $next_cand_index++;
+       print "New candidate: $favored_cand = #$cnum{$favored_cand}\n";
+    }
+    $favored_ind = $cnum{$favored_cand};
+
+    foreach $lower_ind (1..$max_n_cands) {
+      next if $lower_ind == $favored_ind;
+      next if $thismatrix[$lower_ind][$favored_ind] > 0;
+#      print "Marking $favored_ind over $lower_ind\n";
+      $thismatrix[$favored_ind][$lower_ind] = 1;
+    }
+  }
+  print "Vote on line $. ( @vote ):\n"; showmatrix @thismatrix;
+  add_matrix_to_totals @thismatrix, @totals;
+}
+print "\n\nTotals for all votes:\n";
+showmatrix @totals;
+$"=',';
+my ($i, $j, %names, @loses_to);
+%names = reverse %cnum;
+CANDIDATE: foreach $i (1..$next_cand_index-1) {
+   @loses_to = ();
+   COMPETITOR: foreach $j (1..$next_cand_index-1) {
+      next if $i == $j;
+      if ($totals[$i][$j] < $totals[$j][$i]) {
+#         print "Candidate $i ($names{$i}) is not the universal winner -- defeated by $j ($names{$j})\n";
+#         next CANDIDATE;
+         push @loses_to, $j;
+      }
+   }
+   if (@loses_to) {
+     print "Canidate $i ($names{$i}) was defeated by: (@loses_to) (@names{@loses_to})\n";
+   } else {
+     print "Universal winner: candidate $i ($names{$i})\n";
+   }
+}
