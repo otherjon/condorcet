@@ -1,0 +1,29 @@
+# This is a file of data to test and demonstrate a program for the
+#   Condorcet voting system.
+# Each line is a person's vote, which consists of an ordered list of
+#   preferences.
+
+# In the 2000 presidential election, preference was evenly split between
+# Bush and Gore, and most voters ignored third parties.  This is represented
+# by the following 5 votes for Bush and 5 votes for Gore.
+# 
+Bush
+Gore
+Bush
+Gore
+Bush
+Gore
+Bush
+Gore
+Bush
+Gore
+
+# In the following three votes, we model one Bush voter, and two voters who
+# prefer Gore over Bush, but other third-party candidates over Gore.  In a
+# Condorcet voting system, Gore should win.  Under standard plurality voting
+# rules, Bush wins.
+#
+Bush
+Nader Gore
+Buchanan Hagelin Browne Nader Gore   # "ANYONE but Bush, PLEASE!"
+
