@@ -26,17 +26,17 @@ Condorcet winner.  (This could be done using Tideman ranked pairs, Schulze
 
 Input data for this script follows this format:
 
-  # Full-line and in-line comments are allowed, indicated by "#"
-  # Blank lines are ignored
-  
-  # Each non-blank non-comment line is a vote
-  # Each vote lists candidates in order of preference
-  
-  # Here is a single sample vote:
-  AwesomeCandidate GoodCandidate OkayCandidate LousyCandidate
-  
-  # Candidate identifiers can be arbitrary strings, but must contain no spaces
-  # Votes don't need to list all candidates
-  # Unmentioned candidates rank beneath all candidates that were mentioned
+    # Full-line and in-line comments are allowed, indicated by "#"
+    # Blank lines are ignored
+    
+    # Each non-blank non-comment line is a vote
+    # Each vote lists candidates in order of preference
+    
+    # Here is a single sample vote:
+    AwesomeCandidate GoodCandidate OkayCandidate LousyCandidate
+    
+    # Candidate identifiers can be arbitrary strings, but must contain no spaces
+    # Votes don't need to list all candidates
+    # Unmentioned candidates rank beneath all candidates that were mentioned
 
 For more on Condorcet election methods, see [Wikipedia](http://en.wikipedia.org/wiki/Condorcet_method).
