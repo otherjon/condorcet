@@ -1,7 +1,48 @@
 #!/usr/bin/perl
 use strict;
 
-# Condorcet election method
+# Plurality voting, the election method that most people know, is horrible.
+# It doesn't allow voters to fully express their preference, leading to
+# situations such as "voting for the lesser of two evils" because voting for
+# the preferred third-party candidate would be "throwing your vote away", or
+# the possibility of "spoiler candidates" such as Nader in the 2000 U.S.
+# presidential election.  Better election methods exist, and have been known
+# since the 1700s, and aren't even difficult to explain.  Further discussion
+# of election methods is beyond the scope of these file header comments, but
+# well worth your time to research. :)
+#
+# The Condorcet family of election methods includes all methods which elect
+# the "Condorcet winner" if one exists.  A Condorcet winner is a candidate
+# who would beat all other candidates in hypothetical pairwise elections.
+# (Two-candidate elections are easy, and all sensible election methods yield
+# the same results.  It's when there are more than two candidates that things
+# get complicated.)  A single "vote" in a Condorcet election is an ordered
+# list of preferred candidates, indicating e.g. "A > B > C > D > others".
+#
+# This script counts votes and attempts to elect a Condorcet winner, if
+# one exists.  It does not attempt to resolve elections where there is no
+# Condorcet winner.  (This could be done using Tideman ranked pairs, Schulze
+# (a.k.a. Schwartz sequential dropping), or several other methods.)
+#
+# Input data for this script follows this format:
+# ============================================================================
+#
+# # Full-line and in-line comments are allowed, indicated by "#"
+# # Blank lines are ignored
+#
+# # Each non-blank non-comment line is a vote
+# # Each vote lists candidates in order of preference
+#
+# # Here is a single sample vote:
+# AwesomeCandidate GoodCandidate OkayCandidate LousyCandidate
+#
+# # Candidate identifiers can be arbitrary strings, but must contain no spaces
+# # Votes don't need to list all candidates
+# # Unmentioned candidates rank beneath all candidates that were mentioned
+#
+# ============================================================================
+
+# Program structure:
 # Voters rank candidates in order of preference
 # A vote (A, B, C) is interpreted as saying that the voter prefers A over
 #   B and over C (and any other candidates), B over C (and any others),
@@ -9,9 +50,21 @@ use strict;
 # A matrix is generated to reflect these pairwise choices.
 # The total vote is the sum of all vote matrices.
 #
+
+# Global vars.  Yes, they're lame.  But it's a short script, it was written
+# in a quick-and-dirty manner, and it's good enough for now.  I'm sure I'll
+# recant once I try to write unit tests.
 my (@totals, @thismatrix, @vote, $favored_ind, $favored_cand, $lower_ind,
     $lower_cand, $vote_ind, %cnum, $max_n_cands, $next_cand_index);
 
+my $VERBOSITY = 3;
+
+# Args:
+#   $thisvoteptr (pointer to 2-D matrix) - current vote in matrix form
+#   $totalsptr (pointer to 2-D matrix) - all votes so far, summed in matrix form
+# Action:
+#   modifies matrix pointed to by $totalsptr, adding the $thisvoteptr matrix
+#
 sub add_matrix_to_totals (\@\@) {
   my ($thisvoteptr, $totalsptr) = @_;
   my ($i, $j);
@@ -22,6 +75,7 @@ sub add_matrix_to_totals (\@\@) {
   }
 }
 
+# Display a matrix for debugging
 sub showmatrix (@) {
   my (@m) = @_;
   my ($i, $j, $max);
@@ -41,50 +95,74 @@ sub showmatrix (@) {
   print "\n";
 }
 
+
+##############################################################################
+# Main script starts here
+
 my $filename = defined $ARGV[0] ? $ARGV[0] : "./data";
 open DATA, $filename or die "Can't open vote file '$filename'\n";
 $max_n_cands = 6; $next_cand_index = 1;
 
 while (<DATA>) {
-  s/#.*//; next if /^\s*$/;
-  @vote = split;
+  s/#.*//; next if /^\s*$/;   # strip comments, skip blank lines
+  @vote = split;   # $vote[0] = best-liked candidate, etc.
   @thismatrix = ();
   foreach $vote_ind (0..$#vote) {
+    # For each candidate in the ranking:
+    #  * grab the candidate's name if we haven't yet seen it
+    #  * determine the candidate's index (via %cnum hash)
+    #  * update the current vote by, for each other candidate, marking that
+    #      candidate as beaten by this candidate (in the current vote), unless
+    #      we've already marked this candidate as beaten by the other
+    #
+    # The complicated final step is necessary because candidate indices (and
+    # the order the candidates appear in the vote matrix) are completely
+    # independent of the current voter's rankings.
+    #
     $favored_cand = $vote[$vote_ind];
     if (not defined $cnum{$favored_cand}) {
-       $cnum{$favored_cand} = $next_cand_index++;
-       print "New candidate: $favored_cand = #$cnum{$favored_cand}\n";
+      # Store this candidate's name if we haven't yet seen the candidate
+      $cnum{$favored_cand} = $next_cand_index++;
+      print "New candidate: $favored_cand = #$cnum{$favored_cand}\n"
+	  if $VERBOSITY >= 4;
     }
     $favored_ind = $cnum{$favored_cand};
 
+    # Update this vote: Mark every candidate who hasn't already defeated the
+    # current candidate as being beaten by the current candidate.
     foreach $lower_ind (1..$max_n_cands) {
       next if $lower_ind == $favored_ind;
       next if $thismatrix[$lower_ind][$favored_ind] > 0;
-#      print "Marking $favored_ind over $lower_ind\n";
+      print "Marking $favored_ind over $lower_ind\n" if $VERBOSITY >= 6;
       $thismatrix[$favored_ind][$lower_ind] = 1;
     }
   }
-  print "Vote on line $. ( @vote ):\n"; showmatrix @thismatrix;
+  if ($VERBOSITY >= 4) {
+    print "Vote on line $. ( @vote ):\n"; showmatrix @thismatrix;
+  }
   add_matrix_to_totals @thismatrix, @totals;
 }
-print "\n\nTotals for all votes:\n";
-showmatrix @totals;
-$"=',';
+
+# All votes have been tallied.  Display the results.
+#
+# First, results in matrix form:
+print "\n\nTotals for all votes:\n"; showmatrix @totals;
+
+# Now we'll print out the winner/loser status of each candidate.
+
+$"=',';  # print commas between candidate names in "@candidates"
 my ($i, $j, %names, @loses_to);
 %names = reverse %cnum;
-CANDIDATE: foreach $i (1..$next_cand_index-1) {
-   @loses_to = ();
-   COMPETITOR: foreach $j (1..$next_cand_index-1) {
-      next if $i == $j;
-      if ($totals[$i][$j] < $totals[$j][$i]) {
-#         print "Candidate $i ($names{$i}) is not the universal winner -- defeated by $j ($names{$j})\n";
-#         next CANDIDATE;
-         push @loses_to, $j;
-      }
-   }
-   if (@loses_to) {
-     print "Canidate $i ($names{$i}) was defeated by: (@loses_to) (@names{@loses_to})\n";
-   } else {
-     print "Universal winner: candidate $i ($names{$i})\n";
-   }
+foreach $i (1..$next_cand_index-1) {
+  @loses_to = ();
+  foreach $j (1..$next_cand_index-1) {
+    # Find all candidates $j who win over Candidate $i
+    next if $i == $j;
+    if ($totals[$i][$j] < $totals[$j][$i]) {
+      push @loses_to, $j;
+    }
+  }
+  print (@loses_to
+      ? "Canidate $i ($names{$i}) lost to: (@loses_to) (@names{@loses_to})\n"
+      : "Universal winner: candidate $i ($names{$i})\n" );
 }
